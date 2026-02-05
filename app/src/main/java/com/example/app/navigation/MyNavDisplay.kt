@@ -5,8 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import com.example.app.presentation.chat.ChatScreen
-import com.example.app.presentation.detail.DetailScreen
-import com.example.app.presentation.home.HomeScreen
+import com.example.app.presentation.welcome.WelcomeScreen
 
 
 @Composable
@@ -21,9 +20,17 @@ fun MyNavDisplay(
         entryProvider = { navKey ->
             NavEntry(navKey) {
                 when (navKey) {
-                    is Route.Detail -> DetailScreen(id = navKey.id)
-                    Route.Chat -> ChatScreen()
-                    else -> HomeScreen()
+                    is Route.Welcome -> WelcomeScreen(
+                        navigateToChat = {
+                            navigator.navigate(Route.Chat)
+                        }
+                    )
+
+                    Route.Chat -> ChatScreen(
+                        navigateBack = {
+                            navigator.back()
+                        }
+                    )
                 }
             }
         }

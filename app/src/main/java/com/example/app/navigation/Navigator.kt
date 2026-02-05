@@ -1,5 +1,6 @@
 package com.example.app.navigation
 
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 
@@ -10,9 +11,9 @@ class Navigator : ViewModel() {
 
     val routeStack = mutableStateListOf<Route>(Route.default)
 
-//    val currentRoute = derivedStateOf {
-//        routeStack.lastOrNull() ?: throw IllegalStateException("No route in route stack")
-//    }
+    val currentRoute = derivedStateOf {
+        routeStack.lastOrNull() ?: throw IllegalStateException("No route in route stack")
+    }
 
     /**
      * 导航至指定页面
@@ -28,6 +29,6 @@ class Navigator : ViewModel() {
         if (routeStack.size <= 1) {
             return
         }
-        routeStack.removeLastOrNull()
+        routeStack.removeAt(routeStack.size - 1)
     }
 }

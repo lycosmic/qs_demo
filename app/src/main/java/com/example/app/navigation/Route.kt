@@ -5,19 +5,15 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 sealed interface Route : NavKey {
-    // 主页
+    // 欢迎页
     @Serializable
-    object Home : Route
-
-    // 详情页
-    @Serializable
-    data class Detail(val id: String) : Route
+    object Welcome : Route
 
     // AI聊天页
     @Serializable
     object Chat : Route
 
     companion object {
-        val default = Home
+        val default = Welcome
     }
 }

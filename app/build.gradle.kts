@@ -65,4 +65,13 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
+    // Icons
+    implementation(libs.androidx.compose.material.icons.extended)
+
+    // Retrofit
+    implementation(libs.retrofit)
+    implementation(libs.okhttp3.logging.interceptor)
+
+    // Gson
+    implementation(libs.converter.gson)
 }
