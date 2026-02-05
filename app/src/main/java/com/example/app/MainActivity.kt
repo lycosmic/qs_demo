@@ -8,19 +8,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.app.navigation.MyNavDisplay
-import com.example.app.navigation.Navigator
-import com.example.app.navigation.NavigatorViewModelFactory
+import com.example.app.navigation.NavigatorViewModel
 import com.example.app.ui.theme.QuantumStackDemoTheme
+import dagger.hilt.android.AndroidEntryPoint
 
+
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val navigator: Navigator = viewModel(factory = NavigatorViewModelFactory)
-
             QuantumStackDemoTheme {
-                MyNavDisplay(navigator = navigator, modifier = Modifier.fillMaxSize())
+                MyNavDisplay(modifier = Modifier.fillMaxSize())
             }
         }
     }

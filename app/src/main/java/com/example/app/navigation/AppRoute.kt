@@ -4,14 +4,14 @@ import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
 @Serializable
-sealed interface Route : NavKey {
+sealed interface AppRoute : NavKey {
     // 欢迎页
     @Serializable
-    object Welcome : Route
+    object Welcome : AppRoute
 
     // AI聊天页
     @Serializable
-    object Chat : Route
+    object Chat : AppRoute
 
     companion object {
         val default = Welcome

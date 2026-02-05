@@ -2,6 +2,7 @@ package com.example.app.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import com.example.app.presentation.chat.ChatScreen
@@ -11,26 +12,22 @@ import com.example.app.presentation.welcome.WelcomeScreen
 @Composable
 fun MyNavDisplay(
     modifier: Modifier = Modifier,
-    navigator: Navigator
+    viewModel: NavigatorViewModel = hiltViewModel(),
 ) {
     NavDisplay(
-        backStack = navigator.routeStack,
+        backStack = viewModel.appRouteStacks,
         modifier = modifier,
-        onBack = { navigator.back() },
+        onBack = { viewModel.back() },
         entryProvider = { navKey ->
             NavEntry(navKey) {
                 when (navKey) {
-                    is Route.Welcome -> WelcomeScreen(
-                        navigateToChat = {
-                            navigator.navigate(Route.Chat)
+                    is AppRoute.Welcome -> WelcomeScreen(
+                        onStartGameClick = {
+                            viewModel.navigate(AppRoute.Chat)
                         }
                     )
 
-                    Route.Chat -> ChatScreen(
-                        navigateBack = {
-                            navigator.back()
-                        }
-                    )
+                    AppRoute.Chat -> ChatScreen()
                 }
             }
         }
