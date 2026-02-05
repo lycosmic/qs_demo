@@ -4,7 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.app.navigation.MyNavDisplay
 import com.example.app.navigation.Navigator
@@ -16,8 +15,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val factory = remember { NavigatorViewModelFactory() }
-            val navigator: Navigator = viewModel(factory = factory)
+            val navigator: Navigator = viewModel(factory = NavigatorViewModelFactory)
 
             QuantumStackDemoTheme {
                 MyNavDisplay(navigator = navigator)
