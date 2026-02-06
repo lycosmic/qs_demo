@@ -336,7 +336,7 @@ class GameViewModel @Inject constructor(
             appendSystemMessage("请发表遗言...")
             for (deadId in nightResult.deadPlayerIds) {
                 // 调用之前的通用发言方法
-                processSpeech(deadId, isLastWords = _uiState.value.dayCount == 1)
+                processSpeech(deadId, isLastWords = true)
             }
         }
 
@@ -352,7 +352,7 @@ class GameViewModel @Inject constructor(
             updateState { it.copy(currentSpeakerId = player.id) }
 
             // 2. 处理发言 (挂起等待用户输入 或 AI思考)
-            processSpeech(player.id, isLastWords = _uiState.value.dayCount == 1)
+            processSpeech(player.id, isLastWords = false)
         }
 
         // 循环结束，清空发言者
