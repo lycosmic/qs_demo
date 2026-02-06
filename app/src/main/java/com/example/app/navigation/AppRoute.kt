@@ -9,9 +9,9 @@ sealed interface AppRoute : NavKey {
     @Serializable
     object Welcome : AppRoute
 
-    // AI聊天页
+    // 游戏页
     @Serializable
-    object Chat : AppRoute
+    object Game : AppRoute
 
     companion object {
         val default = Welcome

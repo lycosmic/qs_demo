@@ -1,9 +1,7 @@
 package com.example.app.di
 
 import android.annotation.SuppressLint
-import com.example.data.remote.WerewolfApi
-import com.example.data.repository.WebSocketManagerImpl
-import com.example.domain.repository.WebSocketManager
+import com.example.data.remote.AiServiceApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -89,14 +87,8 @@ object NetworkModule {
     // 提供 WerewolfApi
     @Provides
     @Singleton
-    fun provideWerewolfApi(retrofit: Retrofit): WerewolfApi {
-        return retrofit.create(WerewolfApi::class.java)
+    fun provideWerewolfApi(retrofit: Retrofit): AiServiceApi {
+        return retrofit.create(AiServiceApi::class.java)
     }
 
-    // 绑定 WebSocketManager 接口到实现类
-    @Provides
-    @Singleton
-    fun provideWebSocketManager(impl: WebSocketManagerImpl): WebSocketManager {
-        return impl
-    }
 }
