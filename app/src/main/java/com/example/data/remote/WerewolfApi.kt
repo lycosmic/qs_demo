@@ -1,6 +1,5 @@
 package com.example.data.remote
 
-import com.example.data.model.GameStateDto
 import com.example.data.model.VerifyResultDto
 import com.example.data.remote.model.ApiResponse
 import com.example.data.remote.model.ChatRequest
@@ -18,12 +17,12 @@ interface WerewolfApi {
 
     /**
      * 开始游戏
-     * 返回：最新的游戏状态 GameStateDto (或者仅返回成功，状态通过 Socket 推送)
+     * 返回房间 ID，状态通过 Socket 推送
      */
     @POST("game/start")
     suspend fun startGame(
         @Body request: StartGameRequest
-    ): ApiResponse<GameStateDto>
+    ): ApiResponse<String>
 
     /**
      * 发送聊天
@@ -70,7 +69,7 @@ interface WerewolfApi {
 
     /**
      * 预言家验人
-     * 注意：验人结果通常是即时返回的，或者通过 Socket 私聊推送。
+     * 注意：验人结果通常是即时返回的
      */
     @POST("game/action/seer_verify")
     suspend fun seerVerify(

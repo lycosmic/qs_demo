@@ -1,6 +1,5 @@
 package com.example.app.navigation
 
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import javax.inject.Inject
@@ -12,9 +11,6 @@ class NavigatorViewModel @Inject constructor() : ViewModel() {
 
     val appRouteStacks = mutableStateListOf<AppRoute>(AppRoute.default)
 
-    val currentRoute = derivedStateOf {
-        appRouteStacks.lastOrNull() ?: throw IllegalStateException("No route in route stack")
-    }
 
     /**
      * 导航至指定页面

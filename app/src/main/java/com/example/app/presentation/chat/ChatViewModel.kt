@@ -1,5 +1,6 @@
 package com.example.app.presentation.chat
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.domain.model.GamePhase
@@ -9,6 +10,9 @@ import com.example.domain.usecase.base.SendMessageUseCase
 import com.example.domain.usecase.base.StartGameUseCase
 import com.example.domain.usecase.base.VotePlayerUseCase
 import com.example.domain.usecase.seer.SeerVerifyUseCase
+import com.example.domain.usecase.witch.WitchPoisonUseCase
+import com.example.domain.usecase.witch.WitchSaveUseCase
+import com.example.domain.usecase.witch.WitchSkipActionUseCase
 import com.example.domain.usecase.wolf.WolfKillUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +29,9 @@ class ChatViewModel @Inject constructor(
     private val sendMessageUseCase: SendMessageUseCase,
     private val wolfKillUseCase: WolfKillUseCase,
     private val seerVerifyUseCase: SeerVerifyUseCase,
+    private val witchSaveUseCase: WitchSaveUseCase,
+    private val witchPoisonUseCase: WitchPoisonUseCase,
+    private val witchSkipActionUseCase: WitchSkipActionUseCase,
     private val votePlayerUseCase: VotePlayerUseCase
 ) : ViewModel() {
 
@@ -33,6 +40,10 @@ class ChatViewModel @Inject constructor(
 
     init {
         observeGame()
+    }
+
+    companion object {
+        private const val TAG = "ChatViewModel"
     }
 
     private fun observeGame() {
@@ -59,6 +70,7 @@ class ChatViewModel @Inject constructor(
     fun startGame() {
         viewModelScope.launch {
             try {
+                Log.i(TAG, "用户在房间内点击开始游戏")
                 startGameUseCase()
             } catch (e: Exception) {
                 showError(e.message)

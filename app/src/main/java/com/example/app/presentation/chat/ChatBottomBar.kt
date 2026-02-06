@@ -33,7 +33,8 @@ fun GameBottomBar(
     var text by remember { mutableStateOf("") }
     val isNight = uiState.phase.name.startsWith("NIGHT")
     val canChat =
-        uiState.phase == GamePhase.DAY_DISCUSSION || uiState.phase == GamePhase.DAY_VOTING // 简单规则：白天能聊
+        uiState.phase == GamePhase.DAY_DISCUSSION
+//                || uiState.phase == GamePhase.DAY_VOTING // 简单规则：白天能聊
     val myRole = uiState.myRole
 
     // 是否轮到我行动 (且不是聊天阶段)
@@ -74,10 +75,11 @@ fun GameBottomBar(
                 }
             } else if (isActionPhase) {
                 // --- 技能按钮 ---
-                val actionText = when (myRole) {
-                    Role.WOLF -> "🔪 袭击玩家"
-                    Role.SEER -> "🔮 查验身份"
-                    Role.WITCH -> "🧪 使用药水" // 简化，暂只处理一个按钮
+                val actionText = when {
+                    uiState.phase == GamePhase.DAY_VOTING -> "投票"
+                    uiState.myRole == Role.WOLF -> "🔪 袭击玩家"
+                    uiState.myRole == Role.SEER -> "🔮 查验身份"
+                    uiState.myRole == Role.WITCH -> "🧪 使用药水" // 简化，暂只处理一个按钮
                     else -> "行动"
                 }
 

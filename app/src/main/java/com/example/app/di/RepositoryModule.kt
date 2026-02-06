@@ -12,6 +12,12 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
 
+//    @Binds
+//    @Singleton
+//    abstract fun bindWerewolfRepository(
+//        networkRepository: NetworkWerewolfRepository
+//    ): WerewolfRepository
+
     @Binds
     @Singleton
     abstract fun bindWerewolfRepository(

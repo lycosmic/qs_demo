@@ -22,10 +22,13 @@ import androidx.compose.ui.unit.sp
 
 
 @Composable
-fun WelcomeScreen(onStartGameClick: () -> Unit, modifier: Modifier = Modifier) {
-    // 简单的渐变背景，营造狼人杀氛围
+fun WelcomeScreen(onStartGameClick: () -> Unit) {
     val backgroundBrush = Brush.verticalGradient(
-        colors = listOf(Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364))
+        colors = listOf(
+            Color(0xFF0F2027),
+            Color(0xFF203A43),
+            Color(0xFF2C5364)
+        )
     )
 
     Column(

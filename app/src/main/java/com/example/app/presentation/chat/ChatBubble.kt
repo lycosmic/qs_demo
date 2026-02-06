@@ -17,15 +17,20 @@ import com.example.domain.model.MessageType
 
 @Composable
 fun ChatBubble(message: ChatMessage, isMe: Boolean) {
-    val alignment = if (message.type == MessageType.SYSTEM) Alignment.CenterHorizontally else if (isMe) Alignment.End else Alignment.Start
+    val alignment =
+        if (message.type == MessageType.SYSTEM) Alignment.CenterHorizontally else if (isMe) Alignment.End else Alignment.Start
+
     val color = if (message.type == MessageType.SYSTEM) Color.Gray
     else if (isMe) Color(0xFFDCF8C6) else Color.White
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(4.dp),
         horizontalAlignment = alignment
     ) {
         if (message.type != MessageType.SYSTEM && !isMe) {
+            // 发送者
             Text(
                 text = message.senderName,
                 style = MaterialTheme.typography.labelSmall,
@@ -35,14 +40,19 @@ fun ChatBubble(message: ChatMessage, isMe: Boolean) {
 
         Surface(
             shape = RoundedCornerShape(8.dp),
-            color = if (message.type == MessageType.SYSTEM) Color.LightGray.copy(alpha=0.3f) else color,
+            color = if (message.type == MessageType.SYSTEM) Color.LightGray.copy(alpha = 0.3f) else color,
             shadowElevation = 1.dp
         ) {
-            Text(
-                text = message.content,
-                modifier = Modifier.padding(8.dp),
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Column {
+
+
+                // 消息
+                Text(
+                    text = message.content,
+                    modifier = Modifier.padding(8.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
     }
 }

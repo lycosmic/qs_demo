@@ -208,6 +208,10 @@ class MockWerewolfRepository @Inject constructor() : WerewolfRepository {
 
 
     // --- 内部逻辑：模拟游戏引擎---
+
+    /**
+     * 1. 进入夜间，开始狼人环节
+     */
     private suspend fun startNightPhase() {
         updateState {
             it.copy(
@@ -238,6 +242,9 @@ class MockWerewolfRepository @Inject constructor() : WerewolfRepository {
         }
     }
 
+    /**
+     * 2. 女巫环节
+     */
     private suspend fun transitionToWitch() {
         updateState { it.copy(phase = GamePhase.NIGHT_WITCH) }
 
@@ -257,6 +264,9 @@ class MockWerewolfRepository @Inject constructor() : WerewolfRepository {
         }
     }
 
+    /**
+     * 3. 预言家环节
+     */
     private suspend fun transitionToSeer() {
         updateState { it.copy(phase = GamePhase.NIGHT_SEER) }
 
@@ -267,6 +277,9 @@ class MockWerewolfRepository @Inject constructor() : WerewolfRepository {
         }
     }
 
+    /**
+     * 4. 白天环节
+     */
     private suspend fun transitionToDay() {
         updateState { it.copy(phase = GamePhase.DAY_ANNOUNCE) }
         addSystemMessage("=== 天亮了 ===")
@@ -285,6 +298,14 @@ class MockWerewolfRepository @Inject constructor() : WerewolfRepository {
         delay(2000)
         updateState { it.copy(phase = GamePhase.DAY_DISCUSSION) }
         addSystemMessage("请开始发言。")
+    }
+
+    /**
+     * 5. 投票环节
+     */
+    private fun transitionToVote() {
+        updateState { it.copy(phase = GamePhase.DAY_VOTING) }
+        addSystemMessage("请开始投票。")
     }
 
 
