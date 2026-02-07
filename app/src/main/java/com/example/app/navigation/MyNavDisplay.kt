@@ -6,6 +6,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import com.example.app.presentation.game.ChatScreen
+import com.example.app.presentation.game.GameViewModel
 import com.example.app.presentation.welcome.WelcomeScreen
 
 
@@ -27,11 +28,13 @@ fun MyNavDisplay(
                         }
                     )
 
-                    AppRoute.Game -> ChatScreen(
-                        onExitGame = {
-                            viewModel.back()
-                        }
-                    )
+                    AppRoute.Game -> {
+                        ChatScreen(
+                            onExitGame = {
+                                viewModel.back()
+                            },
+                        )
+                    }
                 }
             }
         }

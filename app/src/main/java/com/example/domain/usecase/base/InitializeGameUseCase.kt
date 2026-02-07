@@ -34,6 +34,8 @@ class InitializeGameUseCase @Inject constructor() {
             )
         }
 
+        Log.i("InitializeGameUseCase", "在场的玩家信息: $players")
+
 
         return GameState(
             phase = GamePhase.WAITING,

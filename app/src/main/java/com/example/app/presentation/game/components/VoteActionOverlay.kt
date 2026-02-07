@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -25,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.app.ui.theme.OverlayBackground
 import com.example.domain.model.Player
+import com.example.domain.model.Role
 
 
 /**
@@ -33,7 +33,7 @@ import com.example.domain.model.Player
 @Composable
 fun VoteActionOverlay(
     players: List<Player>, // 传入活着的、除自己以外的玩家
-    onConfirmVote: (String) -> Unit,
+    onConfirmVote: (String?) -> Unit,
     onDismiss: () -> Unit // 点击空白处或返回可关闭
 ) {
     Box(
@@ -56,19 +56,41 @@ fun VoteActionOverlay(
             Spacer(modifier = Modifier.height(40.dp))
 
             // 选人按钮网格
-            val rows = players.chunked(2)
-            rows.forEach { rowPlayers ->
+            val addedPlayers = mutableListOf<Player>()
+            addedPlayers.addAll(players)
+            addedPlayers.add(Player(id = "-1", seatNumber = 0, role = Role.VILLAGER))
+            val rows = addedPlayers.chunked(2)
+            rows.forEachIndexed { outerIndex, rowPlayers ->
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    rowPlayers.forEach { player ->
+                    rowPlayers.forEachIndexed { innerIndex, player ->
+                        val displayText =
+                            if (outerIndex == rows.size - 1 && innerIndex == rowPlayers.size - 1) {
+                                "不投"
+                            } else {
+                                player.seatNumber.toString()
+                            }
+
+                        val voteId = if (outerIndex == rows.size - 1 && innerIndex == rowPlayers.size - 1) {
+                            null
+                        } else {
+                            player.id
+                        }
+
                         Button(
-                            onClick = { onConfirmVote(player.id) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFac8e68)),
+                            onClick = {
+                                onConfirmVote(voteId)
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(
+                                    0xFFac8e68
+                                )
+                            ),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.size(width = 110.dp, height = 70.dp),
                             elevation = ButtonDefaults.buttonElevation(6.dp)
                         ) {
                             Text(
-                                text = "${player.seatNumber}",
+                                text = displayText,
                                 fontSize = 28.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White

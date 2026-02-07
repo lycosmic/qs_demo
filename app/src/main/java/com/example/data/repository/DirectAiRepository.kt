@@ -10,6 +10,7 @@ import com.example.domain.repository.AiActorRepository
 import com.example.domain.repository.WitchAction
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import javax.inject.Inject
 import kotlin.random.Random
@@ -47,6 +48,10 @@ class DirectAiRepository @Inject constructor(
             return gson.fromJson(content, JsonObject::class.java)
         } catch (e: Exception) {
             e.printStackTrace()
+            if (e is CancellationException) {
+                return JsonObject()
+            }
+
             // 兜底：如果 AI 挂了，抛出异常
             throw RuntimeException("AI 连接失败: ${e.message}")
         }
@@ -63,7 +68,7 @@ class DirectAiRepository @Inject constructor(
         } catch (e: Exception) {
             if (retryCount < maxRetries) {
                 // 等待随机时间后重试
-                kotlinx.coroutines.delay(Random.nextLong(0, 1000))
+                delay(Random.nextLong(0, 1000))
                 callAiWithRetry(systemPrompt, userPrompt, retryCount + 1)
             } else {
                 throw e
@@ -78,12 +83,18 @@ class DirectAiRepository @Inject constructor(
 
         val context = AiPromptBuilder.buildGameContext(gameState, wolfId) // 当前AI的ID
 
-        val json = callAi(system, context)
-        val seat = json.get("target_seat").asInt
-
-        // 将座位号转换为 PlayerId
-        return gameState.players.find { it.seatNumber == seat }?.id
-            ?: throw IllegalStateException("无法找到击杀目标座位号")
+        (1..maxRetries).forEach { _ ->
+            try {
+                val json = callAiWithRetry(system, context)
+                val targetSeat = json.get("target_seat").asInt
+                // 将座位号转换为 PlayerId
+                return gameState.players.find { it.seatNumber == targetSeat }?.id
+                    ?: ""
+            } catch (e: Exception) {
+                Log.e(TAG, "获取狼人AI的技能失败: $e")
+            }
+        }
+        return ""
     }
 
     // 2. 女巫 AI
@@ -119,7 +130,7 @@ class DirectAiRepository @Inject constructor(
                     else -> WitchAction.Skip
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "你帮我: $e")
+                Log.e(TAG, "获取女巫AI的技能失败: $e")
             }
         }
 
@@ -132,10 +143,18 @@ class DirectAiRepository @Inject constructor(
                 "\n任务：请选择一个查验目标。优先查验有嫌疑的玩家。返回JSON: {\"target_seat\": int}"
         val context = AiPromptBuilder.buildGameContext(gameState, seerId)
 
-        val json = callAi(system, context)
-        val seat = json.get("target_seat").asInt
-        return gameState.players.find { it.seatNumber == seat }?.id
-            ?: throw IllegalStateException("无法找到预言目标座位号")
+        (1..maxRetries).forEach { _ ->
+            try {
+                val json = callAiWithRetry(system, context)
+                val seat = json.get("target_seat").asInt
+                return gameState.players.find { it.seatNumber == seat }?.id
+                    ?: ""
+            } catch (e: Exception) {
+                Log.e(TAG, "获取预言家AI的技能失败: $e")
+            }
+        }
+
+        return ""
     }
 
     // 4. 白天发言
@@ -156,15 +175,29 @@ class DirectAiRepository @Inject constructor(
     }
 
     // 5. 投票
-    override suspend fun getVoteTarget(gameState: GameState, voterId: String): String {
+    override suspend fun getVoteTarget(gameState: GameState, voterId: String): String? {
         val player = gameState.players.find { it.id == voterId }!!
+
+        // 构建提示词
+        var taskPrompt = "现在是公投阶段。"
+
+        if (gameState.isPKPhase) {
+            // 获取PK台玩家号码
+            val pkSeats = gameState.players
+                .filter { it.id in gameState.pkTargetIds }
+                .map { it.seatNumber }
+
+            taskPrompt += "注意：发生了平票PK！你只能在 $pkSeats 号之间选择投谁。"
+        } else {
+            taskPrompt += "请选择你要投谁出局。"
+        }
+
         val system = AiPromptBuilder.buildSystemPrompt(player.role) +
-                "\n任务：现在公投阶段，请选择你要投谁出局。返回JSON: {\"target_seat\": int}"
+                "\n任务：$taskPrompt 返回JSON: {\"target_seat\": int}，如果弃权，请返回JSON: {\"target_seat\": -1}"
 
         val context = AiPromptBuilder.buildGameContext(gameState, voterId)
         val json = callAi(system, context)
         val seat = json.get("target_seat").asInt
         return gameState.players.find { it.seatNumber == seat }?.id
-            ?: throw IllegalStateException("无法找到投票目标座位号")
     }
 }

@@ -31,7 +31,7 @@ import com.example.domain.model.ChatMessage
  * 聊天气泡
  */
 @Composable
-fun ChatBubble(message: ChatMessage, isMe: Boolean) {
+fun ChatBubble(message: ChatMessage, isMe: Boolean, seatNo: String) {
     val arrangement = if (isMe) Arrangement.End else Arrangement.Start
 
     val bubbleColor = if (isMe) Color(0xFFa2835e) else Color(0xFFFFFFFF) // 纯白
@@ -49,7 +49,7 @@ fun ChatBubble(message: ChatMessage, isMe: Boolean) {
     ) {
         // --- 1. 别人的头像 (在左边) ---
         if (!isMe) {
-            Avatar(isSystem = message.isSystemMessage())
+            Avatar(isSystem = message.isSystemMessage(), seatNo = seatNo)
             Spacer(modifier = Modifier.width(8.dp))
         }
 
@@ -59,10 +59,10 @@ fun ChatBubble(message: ChatMessage, isMe: Boolean) {
             horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
             modifier = Modifier.weight(1f, fill = false) // fill=false 让气泡宽度自适应内容
         ) {
-            // 显示发送者名字 (如果是系统法官，通常不显示名字，只看头像)
+            // 显示发送者名字
             if (!isMe && !message.isSystemMessage()) {
                 Text(
-                    text = message.senderName,
+                    text = "${message.senderName} 号",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF999999),
                     modifier = Modifier.padding(bottom = 2.dp, start = 4.dp)
@@ -89,7 +89,7 @@ fun ChatBubble(message: ChatMessage, isMe: Boolean) {
         // --- 3. 自己的头像 (在右边) ---
         if (isMe) {
             Spacer(modifier = Modifier.width(8.dp))
-            Avatar(isSystem = false)
+            Avatar(isSystem = false, seatNo = seatNo)
         }
     }
 }
@@ -100,13 +100,21 @@ fun ChatBubble(message: ChatMessage, isMe: Boolean) {
  * 根据名字或类型显示不同的图标/图片
  */
 @Composable
-fun Avatar(isSystem: Boolean) {
+fun Avatar(isSystem: Boolean, seatNo: String) {
     // 头像大小
     val avatarSize = 40.dp
+    val playersAvatar = listOf(
+        R.drawable.player_1,
+        R.drawable.player_2,
+        R.drawable.player_3,
+        R.drawable.player_4,
+        R.drawable.player_5
+    )
 
     val imageRes = when {
         isSystem -> R.drawable.avatar_judge
-        else -> R.drawable.ic_launcher_background
+        seatNo.isNotEmpty() -> playersAvatar[seatNo.toInt() - 1]
+        else -> R.drawable.ic_launcher_foreground
     }
 
     Surface(

@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import android.util.Log
 import com.example.domain.model.GameState
 import com.example.domain.model.Role
 
@@ -28,6 +29,11 @@ object AiPromptBuilder {
 
     // 生成当前局势描述
     fun buildGameContext(gameState: GameState, myId: String): String {
+        if (gameState.players.isEmpty() || myId.isBlank()) {
+            Log.e("AiPromptBuilder", "当前游戏可能已经结束，不再生成游戏上下文")
+            return "游戏已经结束，不再生成游戏上下文，请不要返回空数据"
+        }
+
         val me = gameState.players.find { it.id == myId }!!
         val alivePlayers = gameState.players.filter { it.isAlive }.map { "${it.seatNumber}号" }
         val deadPlayers = gameState.players.filter { !it.isAlive }.map { "${it.seatNumber}号" }

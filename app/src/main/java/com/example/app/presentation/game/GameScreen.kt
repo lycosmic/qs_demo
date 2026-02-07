@@ -55,7 +55,6 @@ import com.example.app.presentation.game.components.witch.WitchFeedbackOverlay
 import com.example.app.presentation.game.components.witch.WitchPoisonSelectOverlay
 import com.example.app.presentation.game.components.wolf.WolfActionOverlay
 import com.example.domain.model.GamePhase
-import com.example.domain.model.Player
 import com.example.domain.model.Role
 import kotlinx.coroutines.delay
 
@@ -116,8 +115,14 @@ fun ChatScreen(onExitGame: () -> Unit, viewModel: GameViewModel = hiltViewModel(
 
     // --- 投票逻辑状态 ---
     // 是否可以投票：阶段是 DAY_VOTING 且 我活着
-    val canVote = uiState.phase == GamePhase.DAY_VOTING &&
-            (uiState.players.find { it.isMe }?.isAlive == true)
+    val myPlayer = uiState.players.find { it.isMe }
+    val canVote = if (uiState.isPKPhase) {
+        // 特殊点：PK投票：活着 且 不在PK台上
+        uiState.phase == GamePhase.DAY_VOTING &&
+                myPlayer?.isAlive == true && myPlayer.id !in uiState.pkTargetIds
+    } else {
+        uiState.phase == GamePhase.DAY_VOTING && (myPlayer?.isAlive == true)
+    }
 
     // 控制投票弹窗显示
     var showVoteOverlay by remember { mutableStateOf(false) }
@@ -162,8 +167,8 @@ fun ChatScreen(onExitGame: () -> Unit, viewModel: GameViewModel = hiltViewModel(
                     titleColor = if (isNight) Color.White else Color.Black,
                     containerColor = bgColor,
                     onExit = {
-                        viewModel.exitGame()
                         onExitGame()
+                        viewModel.exitGame()
                     },
                     isVotingEnabled = canVote,
                     onVoteClick = {
@@ -220,7 +225,11 @@ fun ChatScreen(onExitGame: () -> Unit, viewModel: GameViewModel = hiltViewModel(
                                 msg.senderId == uiState.myId
 
                         if (isVisible) {
-                            ChatBubble(message = msg, isMe = msg.senderId == uiState.myId)
+                            ChatBubble(
+                                message = msg,
+                                seatNo = msg.senderName,
+                                isMe = msg.senderId == uiState.myId
+                            )
                         }
                     }
                 }
@@ -406,8 +415,13 @@ fun ChatScreen(onExitGame: () -> Unit, viewModel: GameViewModel = hiltViewModel(
             exit = fadeOut(),
             modifier = Modifier.zIndex(2f)
         ) {
-            // 筛选目标：活着的、非自己的玩家
-            val targets = uiState.players.filter { !it.isMe && it.isAlive }
+            val targets = if (uiState.isPKPhase) {
+                // PK阶段：只能投 PK 台上的人
+                uiState.players.filter { it.id in uiState.pkTargetIds && !it.isMe }
+            } else {
+                // 正常阶段：投除了自己以外活着的玩家
+                uiState.players.filter { !it.isMe && it.isAlive }
+            }
 
             VoteActionOverlay(
                 players = targets,

@@ -52,6 +52,7 @@ data class GameState(
     val witchInventory: WitchInventory = WitchInventory(),
     val seerResult: SeerVerificationResult? = null,
     val currentSpeakerId: String? = null,
+    val isPKPhase: Boolean = false, // 是否是平票PK阶段
     // 0 = 正常投票, 1 = PK 轮投票
     val votingRound: Int = 0,
     // 记录上一轮平票的玩家 ID

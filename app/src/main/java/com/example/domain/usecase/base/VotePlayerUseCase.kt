@@ -7,6 +7,8 @@ import javax.inject.Inject
 class CalculateVoteResultUseCase @Inject constructor() {
 
     sealed class VoteOutcome {
+        // 无人投票，平安日
+        data object SafeDay : VoteOutcome()
         data class PlayerOut(val playerId: String) : VoteOutcome() // 有人出局
         data class TiePK(val playerIds: List<String>) : VoteOutcome() // 平票，进入PK
         data object TieNoOut : VoteOutcome() // 再次平票，无人出局
@@ -18,6 +20,8 @@ class CalculateVoteResultUseCase @Inject constructor() {
     operator fun invoke(gameState: GameState, votes: Map<String, String>): VoteOutcome {
         // 1. 统计票数
         val voteCounts = votes.values.groupingBy { it }.eachCount()
+        if (voteCounts.isEmpty()) return VoteOutcome.TieNoOut
+
         val maxVotes = voteCounts.values.maxOrNull() ?: 0
 
         // 2. 找到得票最高的玩家们

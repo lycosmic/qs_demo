@@ -8,6 +8,7 @@ import com.example.domain.model.ChatMessage.Companion.SYSTEM_MESSAGE_SENDER_ID
 import com.example.domain.model.GamePhase
 import com.example.domain.model.GameState
 import com.example.domain.model.NightCache
+import com.example.domain.model.Player
 import com.example.domain.model.Role
 import com.example.domain.model.SeerVerificationResult
 import com.example.domain.model.WinResult
@@ -21,7 +22,12 @@ import com.example.domain.usecase.rules.ValidateWitchActionUseCase
 import com.example.domain.usecase.rules.ValidateWolfKillUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,7 +59,7 @@ class GameViewModel @Inject constructor(
 
     // --- 辅助状态：用户交互控制器 ---
     // 用于在协程中“挂起”等待用户点击按钮
-    private var userActionDeferred: CompletableDeferred<String>? = null
+    private var userActionDeferred: CompletableDeferred<String?>? = null
 
     // 用于等待用户输入文本
     private var userSpeechDeferred: CompletableDeferred<String>? = null
@@ -62,6 +68,8 @@ class GameViewModel @Inject constructor(
     private val _errorFlow = MutableSharedFlow<String>()
     val errorFlow = _errorFlow.asSharedFlow()
 
+    private var gameJob: Job? = null
+
     companion object {
         const val TAG = "GameViewModel"
     }
@@ -69,7 +77,10 @@ class GameViewModel @Inject constructor(
     fun startGame() {
         if (_uiState.value.phase != GamePhase.WAITING) return
 
-        viewModelScope.launch {
+        // 启动前先取消旧的，防止重复
+        gameJob?.cancel()
+
+        gameJob = viewModelScope.launch {
             // 1. 初始化数据
             val initialState = initializeGameUseCase()
             _uiState.value = initialState
@@ -83,8 +94,19 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 退出游戏
+     */
+    fun exitGame() {
+        // 1. 停止所有任务
+        gameJob?.cancel()
+
+        // 2. 清空数据
+        _uiState.value = GameState()
+    }
+
     // 用户点击了操作目标 (刀人、验人、投票)
-    fun onUserAction(targetId: String) {
+    fun onUserAction(targetId: String?) {
         // 如果协程正在等待结果，则提交结果
         if (userActionDeferred?.isActive == true) {
             userActionDeferred?.complete(targetId)
@@ -110,22 +132,28 @@ class GameViewModel @Inject constructor(
     private suspend fun runGameLoop() {
         while (true) {
             // === 1. 夜间流程 ===
+            viewModelScope.ensureActive()
             runNightPhase()
 
             // === 2. 天亮结算 ===
+            viewModelScope.ensureActive()
             val nightResult = calculateNightResultUseCase(_uiState.value)
             announceNightResult(nightResult)
 
             // === 3. 胜负判定 (天亮后) ===
+            viewModelScope.ensureActive()
             if (checkGameOver()) break
 
             // === 4. 白天流程 (发言) ===
+            viewModelScope.ensureActive()
             runDayDiscussionPhase(nightResult)
 
             // === 5. 投票流程 ===
+            viewModelScope.ensureActive()
             runVotingPhase()
 
             // === 6. 胜负判定 (投票后) ===
+            viewModelScope.ensureActive()
             if (checkGameOver()) break
 
             // 准备进入下一夜
@@ -231,7 +259,7 @@ class GameViewModel @Inject constructor(
                 val inputId = waitForUserActionInput()
                 try {
                     if (validateWolfKillUseCase(inputId)) {
-                        wolfKillId = inputId
+                        wolfKillId = inputId!!
                         break
                     }
                 } catch (e: Exception) {
@@ -240,6 +268,7 @@ class GameViewModel @Inject constructor(
             }
         } else {
             // B. 我是好人：调用 AI
+            viewModelScope.ensureActive()
             appendSystemMessage("狼人正在行动...", goodIds)
             val wolfId = _uiState.value.players.find { it.role == Role.WOLF }?.id ?: ""
             wolfKillId = aiRepository.getWolfKillTarget(_uiState.value, wolfId)
@@ -268,7 +297,7 @@ class GameViewModel @Inject constructor(
             // 这里 UI 会根据 State 显示“救/毒/跳过”按钮，逻辑较复杂，简化为：等待用户指令
             // 我们假设 UI 返回的 inputId 格式： "SAVE:id" 或 "POISON:id" 或 "SKIP"
             while (true) {
-                val actionCmd = waitForUserActionInput() // 解析命令
+                val actionCmd = waitForUserActionInput()!! // 解析命令
                 try {
                     val (type, target) = parseWitchCommand(actionCmd)
                     // 调用 UseCase 校验
@@ -306,9 +335,10 @@ class GameViewModel @Inject constructor(
             }
         } else {
             // B. AI 女巫
+            viewModelScope.ensureActive()
             appendSystemMessage("女巫正在行动...", getOtherPlayerIds(Role.WITCH))
             val witchId = _uiState.value.players.find { it.role == Role.WITCH }?.id
-                ?: throw IllegalStateException("无女巫")
+                ?: ""
             when (val action = aiRepository.getWitchAction(_uiState.value, wolfKillId, witchId)) {
                 is WitchAction.Save -> updateState {
                     it.copy(
@@ -349,7 +379,7 @@ class GameViewModel @Inject constructor(
 
         if (myRole == Role.SEER && _uiState.value.players.find { it.isMe }?.isAlive == true) {
             appendSystemMessage("请选择查验目标...", listOf(getMyId()))
-            val targetId = waitForUserActionInput()
+            val targetId = waitForUserActionInput()!!
 
             val targetPlayer = _uiState.value.players.find { it.id == targetId }
             if (targetPlayer != null) {
@@ -378,10 +408,33 @@ class GameViewModel @Inject constructor(
                 delay(3000)
             }
         } else {
+            viewModelScope.ensureActive()
+
             appendSystemMessage("预言家正在行动...", getOtherPlayerIds(Role.SEER))
             val seerId = _uiState.value.players.find { it.role == Role.SEER }?.id ?: ""
             val targetId = aiRepository.getSeerVerifyTarget(_uiState.value, seerId)
-            updateState { it.copy(nightCache = it.nightCache.copy(seerVerifyTargetId = targetId)) }
+            val targetPlayer = _uiState.value.players.find { it.id == targetId }
+            targetPlayer?.let {
+                val isGood = targetPlayer.role != Role.WOLF
+                updateState {
+                    it.copy(
+                        nightCache = it.nightCache.copy(seerVerifyTargetId = targetId),
+                        seerResult = SeerVerificationResult(targetId, isGood),
+                    )
+                }
+
+                if (isGood) {
+                    appendSystemMessage(
+                        "${getPlayerName(targetId)} 是好人",
+                        getPlayerIdsByRole(Role.SEER)
+                    )
+                } else {
+                    appendSystemMessage(
+                        "${getPlayerName(targetId)} 是狼人",
+                        getPlayerIdsByRole(Role.SEER)
+                    )
+                }
+            }
         }
         delay(1000)
     }
@@ -426,10 +479,10 @@ class GameViewModel @Inject constructor(
         isLastWords: Boolean // 是否有最后的遗言
     ) {
         val player = _uiState.value.players.find { it.id == playerId } ?: return
-        val prefix = if (isLastWords) "【遗言】" else "【发言】"
+        val hintMassage = if (isLastWords) "请发表遗言..." else "请进行发言..."
 
         if (player.isMe) {
-            appendSystemMessage("$prefix 请发言...")
+            appendSystemMessage(hintMassage)
             // UI 会检测到是用户的回合，解锁输入框
             val content = waitForUserSpeechInput()
             // 发送消息
@@ -459,9 +512,11 @@ class GameViewModel @Inject constructor(
             if (player.isMe) {
                 appendSystemMessage("请你选择投票对象...")
                 val targetId = waitForUserActionInput()
-                votes[player.id] = targetId
+                targetId?.let {
+                    votes[player.id] = targetId
+                }
             } else {
-                val targetId = aiRepository.getVoteTarget(_uiState.value, player.id)
+                val targetId = aiRepository.getVoteTarget(_uiState.value, player.id) ?: continue
                 votes[player.id] = targetId
             }
         }
@@ -474,34 +529,116 @@ class GameViewModel @Inject constructor(
         delay(2000)
 
         // 3. 计算出局
-        when (val result = calculateVoteResultUseCase(_uiState.value, votes)) {
-            is CalculateVoteResultUseCase.VoteOutcome.PlayerOut -> {
-                val outId = result.playerId
-                appendSystemMessage("${getPlayerName(outId)} 被放逐。")
+        var result = calculateVoteResultUseCase(_uiState.value, votes)
+        while (true) {
+            when (result) {
+                is CalculateVoteResultUseCase.VoteOutcome.PlayerOut -> {
+                    val outId = result.playerId
+                    appendSystemMessage("${getPlayerName(outId)} 被放逐。")
 
-                // 处死玩家
-                updateState { state ->
-                    val newPlayers = state.players.map {
-                        if (it.id == outId) it.copy(isAlive = false) else it
+                    // 处死玩家
+                    updateState { state ->
+                        val newPlayers = state.players.map {
+                            if (it.id == outId) it.copy(isAlive = false) else it
+                        }
+                        state.copy(players = newPlayers)
                     }
-                    state.copy(players = newPlayers)
+
+                    // 遗言判定 (首日出局)
+                    if (_uiState.value.dayCount == 1) {
+                        updateState { it.copy(currentSpeakerId = outId) }
+
+                        processSpeech(outId, isLastWords = true)
+                    }
+
+                    break
                 }
 
-                // 遗言判定 (首日出局)
-                if (_uiState.value.dayCount == 1) {
-                    updateState { it.copy(currentSpeakerId = outId) }
+                is CalculateVoteResultUseCase.VoteOutcome.TiePK -> {
+                    val pkPlayerIds = result.playerIds
+                    val pkNames = pkPlayerIds.joinToString { getSeatById(it).toString() + "号" }
+                    appendSystemMessage("出现平票！$pkNames 进入PK环节。")
 
-                    processSpeech(outId, isLastWords = true)
+                    updateState {
+                        it.copy(
+                            isPKPhase = true,
+                            votingRound = 1,
+                            pkTargetIds = pkPlayerIds
+                        )
+                    }
+
+                    // 2. PK 发言环节
+                    // 规则：PK台上的玩家轮流发言，其他玩家禁言
+                    val pkPlayers = _uiState.value.players.filter { it.id in pkPlayerIds }
+                        .sortedBy { it.seatNumber }
+
+                    appendSystemMessage("请PK台上的玩家轮流发言。")
+                    updateState { it.copy(currentSpeakerId = null) }
+
+                    for (player in pkPlayers) {
+                        updateState { it.copy(currentSpeakerId = player.id) }
+                        processSpeech(player.id, isLastWords = false)
+                    }
+                    updateState { it.copy(currentSpeakerId = null) }
+
+                    // 3. 再次投票
+                    // 规则：PK台上的玩家通常不能投票（或者只能投给自己/放弃）
+                    val votes = mutableMapOf<String, String>()
+                    val voters =
+                        _uiState.value.players.filter { it.isAlive && it.id !in pkPlayerIds }
+
+                    if (voters.isEmpty()) {
+                        appendSystemMessage("场外无有票权的玩家，无人出局。")
+                        return
+                    }
+
+                    appendSystemMessage("请场外玩家再次投票（只能投给 $pkNames）。")
+                    for (votePlayer in voters) {
+                        if (votePlayer.isMe) {
+                            appendSystemMessage("请你选择投票对象...")
+                            val targetId = waitForUserActionInput()
+                            targetId?.let {
+                                if (targetId !in pkPlayerIds) {
+                                    Log.e(TAG, "投票对象无效，只能投票给 $pkNames")
+                                    return@let null
+                                }
+                                votes[votePlayer.id] = targetId
+                            }
+                        } else {
+                            val targetId = aiRepository.getVoteTarget(_uiState.value, votePlayer.id)
+                                ?: continue
+                            votes[votePlayer.id] = targetId
+                        }
+                    }
+
+                    // 2. 公布票型
+                    val voteSummary = votes.entries.joinToString("\n") { (voter, target) ->
+                        "${getPlayerName(voter)} -> ${getPlayerName(target)}"
+                    }
+                    appendSystemMessage("投票结果：\n$voteSummary")
+
+                    result = calculateVoteResultUseCase(_uiState.value, votes)
+                    delay(2000)
+                }
+
+                is CalculateVoteResultUseCase.VoteOutcome.TieNoOut -> {
+                    appendSystemMessage("再次平票！本轮无人出局，直接进入天黑。")
+                    break
+                }
+
+                is CalculateVoteResultUseCase.VoteOutcome.SafeDay -> {
+                    appendSystemMessage("无人投票，无人出局。")
+                    break
                 }
             }
+        }
 
-            is CalculateVoteResultUseCase.VoteOutcome.TiePK -> {
-                appendSystemMessage("平票 PK，无人出局。(五人本简化，直接进入下一夜)")
-            }
-
-            is CalculateVoteResultUseCase.VoteOutcome.TieNoOut -> {
-                appendSystemMessage("再次平票，平安日。")
-            }
+        updateState {
+            it.copy(
+                isPKPhase = false,
+                pkTargetIds = emptyList(),
+                votingRound = 0,
+            )
         }
         delay(2000)
     }
@@ -572,8 +709,8 @@ class GameViewModel @Inject constructor(
     private fun uuid() = UUID.randomUUID().toString()
 
     // 关键：挂起函数，等待用户操作
-    private suspend fun waitForUserActionInput(): String {
-        val deferred = CompletableDeferred<String>()
+    private suspend fun waitForUserActionInput(): String? {
+        val deferred = CompletableDeferred<String?>()
         userActionDeferred = deferred
         // 这里会一直挂起，直到 onUserAction 被调用
         val result = deferred.await()
@@ -590,12 +727,16 @@ class GameViewModel @Inject constructor(
         return result
     }
 
-    /**
-     * 退出游戏，清空状态
-     */
-    fun exitGame() {
-        updateState { GameState() }
+    // 销毁时机
+    override fun onCleared() {
+        super.onCleared()
+        println("GameViewModel 已销毁，所有逻辑停止！")
     }
 
-
+    /**
+     * 获取座位号
+     */
+    fun getSeatById(id: String): Int {
+        return _uiState.value.players.find { it.id == id }?.seatNumber ?: -1
+    }
 }

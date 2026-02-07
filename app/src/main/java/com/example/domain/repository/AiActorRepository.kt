@@ -24,7 +24,7 @@ interface AiActorRepository {
     suspend fun getDaySpeech(gameState: GameState, speakerId: String): String
 
     // 获取 AI 的投票目标
-    suspend fun getVoteTarget(gameState: GameState, voterId: String): String
+    suspend fun getVoteTarget(gameState: GameState, voterId: String): String?
 }
 
 // 定义女巫 AI 的返回结构
