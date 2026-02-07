@@ -532,6 +532,16 @@ class GameViewModel @Inject constructor(
         var result = calculateVoteResultUseCase(_uiState.value, votes)
         while (true) {
             when (result) {
+                is CalculateVoteResultUseCase.VoteOutcome.SafeDay -> {
+                    appendSystemMessage("无人投票，无人出局。")
+                    break
+                }
+
+                is CalculateVoteResultUseCase.VoteOutcome.TieNoOut -> {
+                    appendSystemMessage("再次平票！本轮无人出局，直接进入天黑。")
+                    break
+                }
+
                 is CalculateVoteResultUseCase.VoteOutcome.PlayerOut -> {
                     val outId = result.playerId
                     appendSystemMessage("${getPlayerName(outId)} 被放逐。")
@@ -545,7 +555,7 @@ class GameViewModel @Inject constructor(
                     }
 
                     // 遗言判定 (首日出局)
-                    if (_uiState.value.dayCount == 1) {
+                    if (_uiState.value.dayCount == 1 && !checkGameOver()) {
                         updateState { it.copy(currentSpeakerId = outId) }
 
                         processSpeech(outId, isLastWords = true)
@@ -619,16 +629,6 @@ class GameViewModel @Inject constructor(
 
                     result = calculateVoteResultUseCase(_uiState.value, votes)
                     delay(2000)
-                }
-
-                is CalculateVoteResultUseCase.VoteOutcome.TieNoOut -> {
-                    appendSystemMessage("再次平票！本轮无人出局，直接进入天黑。")
-                    break
-                }
-
-                is CalculateVoteResultUseCase.VoteOutcome.SafeDay -> {
-                    appendSystemMessage("无人投票，无人出局。")
-                    break
                 }
             }
         }
