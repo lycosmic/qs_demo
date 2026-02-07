@@ -9,16 +9,16 @@ import com.example.domain.model.GameState
 interface AiActorRepository {
 
     // 获取狼人 AI 的击杀目标，使用当前游戏状态告知 AI 上下文
-    suspend fun getWolfKillTarget(gameState: GameState): String
+    suspend fun getWolfKillTarget(gameState: GameState, wolfId: String): String
 
     /**
      * 获取女巫 AI 的行动 (救人/毒人/跳过)
      * 传入昨夜被刀的玩家 ID，帮助女巫决策
      */
-    suspend fun getWitchAction(gameState: GameState, wolfKillTargetId: String?): WitchAction
+    suspend fun getWitchAction(gameState: GameState, wolfKillTargetId: String?, witchId: String): WitchAction
 
     // 获取预言家 AI 的验人目标
-    suspend fun getSeerVerifyTarget(gameState: GameState): String
+    suspend fun getSeerVerifyTarget(gameState: GameState, seerId: String): String
 
     // 获取 id 为 speakerId 的 AI 的白天发言
     suspend fun getDaySpeech(gameState: GameState, speakerId: String): String

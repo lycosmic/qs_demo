@@ -10,6 +10,8 @@ enum class Role(val roleName: String) {
     WITCH("女巫"),      // 女巫
 }
 
+
+
 /**
  * 阵营
  */

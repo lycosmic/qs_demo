@@ -27,7 +27,11 @@ fun MyNavDisplay(
                         }
                     )
 
-                    AppRoute.Game -> ChatScreen()
+                    AppRoute.Game -> ChatScreen(
+                        onExitGame = {
+                            viewModel.back()
+                        }
+                    )
                 }
             }
         }

@@ -1,7 +1,7 @@
 package com.example.app.di
 
 import android.annotation.SuppressLint
-import com.example.data.remote.AiServiceApi
+import com.example.data.remote.OpenAiApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -30,43 +30,15 @@ object NetworkModule {
         }
     }
 
-    // 提供信任所有证书的TrustManager
-    @SuppressLint("CustomX509TrustManager")
-    @Provides
-    @Singleton
-    fun provideUnsafeTrustManager(): X509TrustManager {
-        return object : X509TrustManager {
-            override fun checkClientTrusted(
-                chain: Array<out X509Certificate>?,
-                authType: String?
-            ) {
-            }
 
-            override fun checkServerTrusted(
-                chain: Array<out X509Certificate>?,
-                authType: String?
-            ) {
-            }
-
-            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-        }
-    }
-
-    // 提供 OkHttpClient (包含心跳配置，防止 WebSocket 断连)
+    // 提供 OkHttpClient
     @Provides
     @Singleton
     fun provideOkHttpClient(
-        loggingInterceptor: HttpLoggingInterceptor,
-        trustManager: X509TrustManager
+        loggingInterceptor: HttpLoggingInterceptor
     ): OkHttpClient {
-        // 创建不安全的SSL上下文
-        val sslContext = SSLContext.getInstance("SSL")
-        sslContext.init(null, arrayOf<TrustManager>(trustManager), java.security.SecureRandom())
-
-
         return OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)
-            .pingInterval(30, TimeUnit.SECONDS) // 发送心跳包保持连接
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
@@ -77,18 +49,19 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
+        val baseUrl = "https://api.deepseek.com/v1/"
         return Retrofit.Builder()
-            .baseUrl("http://192.168.124.27:8000/wolf/api/")
+            .baseUrl(baseUrl)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
 
-    // 提供 WerewolfApi
+    // 提供 OpenAiApi
     @Provides
     @Singleton
-    fun provideWerewolfApi(retrofit: Retrofit): AiServiceApi {
-        return retrofit.create(AiServiceApi::class.java)
+    fun provideWerewolfApi(retrofit: Retrofit): OpenAiApi {
+        return retrofit.create(OpenAiApi::class.java)
     }
 
 }

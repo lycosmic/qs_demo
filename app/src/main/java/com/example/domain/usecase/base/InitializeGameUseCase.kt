@@ -34,7 +34,6 @@ class InitializeGameUseCase @Inject constructor() {
             )
         }
 
-        Log.d("InitializeGameUseCase", "玩家列表: $players")
 
         return GameState(
             phase = GamePhase.WAITING,
@@ -45,7 +44,6 @@ class InitializeGameUseCase @Inject constructor() {
                     "SYSTEM",
                     "法官",
                     "身份已分配，游戏开始！",
-                    true
                 )
             )
         )

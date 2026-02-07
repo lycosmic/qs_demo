@@ -1,15 +1,16 @@
 package com.example.app.presentation.game
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.domain.model.ChatMessage
+import com.example.domain.model.ChatMessage.Companion.SYSTEM_MESSAGE_SENDER_ID
 import com.example.domain.model.GamePhase
 import com.example.domain.model.GameState
 import com.example.domain.model.NightCache
 import com.example.domain.model.Role
 import com.example.domain.model.SeerVerificationResult
 import com.example.domain.model.WinResult
-import com.example.domain.model.WitchInventory
 import com.example.domain.repository.AiActorRepository
 import com.example.domain.repository.WitchAction
 import com.example.domain.usecase.base.CalculateNightResultUseCase
@@ -61,6 +62,10 @@ class GameViewModel @Inject constructor(
     private val _errorFlow = MutableSharedFlow<String>()
     val errorFlow = _errorFlow.asSharedFlow()
 
+    companion object {
+        const val TAG = "GameViewModel"
+    }
+
     fun startGame() {
         if (_uiState.value.phase != GamePhase.WAITING) return
 
@@ -68,6 +73,8 @@ class GameViewModel @Inject constructor(
             // 1. 初始化数据
             val initialState = initializeGameUseCase()
             _uiState.value = initialState
+
+            Log.d(TAG, "当前游戏阶段: 等待中（${_uiState.value.phase}）")
 
             delay(1500)
 
@@ -136,6 +143,11 @@ class GameViewModel @Inject constructor(
     private suspend fun announceNightResult(nightResult: CalculateNightResultUseCase.NightResult) {
         // 1. 切换到“天亮宣布”阶段 (此时 UI 背景通常会变亮)
         updateState { it.copy(phase = GamePhase.DAY_ANNOUNCE) }
+        Log.d(
+            TAG,
+            "当前游戏阶段: 白天死讯通告（${_uiState.value.phase}）"
+        )
+
         appendSystemMessage("=== 天亮了 ===")
         delay(1500) // 模拟天亮动画时间
 
@@ -144,7 +156,7 @@ class GameViewModel @Inject constructor(
         // 2. 根据结果判定
         if (deadIds.isEmpty()) {
             // A. 平安夜
-            appendSystemMessage("昨夜平安夜，无人死亡。请从1号开始依次发言")
+            appendSystemMessage("昨夜平安夜，无人死亡。请开始依次发言")
         } else {
             // B. 有人死亡
             // 获取死者名字用于显示 (例如 "3号、5号")
@@ -153,7 +165,7 @@ class GameViewModel @Inject constructor(
                 if (p?.isMe == true) "你" else "${p?.seatNumber}号"
             }
 
-            appendSystemMessage("昨夜 $deadNames 死亡。请从1号开始依次发言")
+            appendSystemMessage("昨夜 $deadNames 死亡。请开始依次发言")
 
             // --- 核心逻辑：真正处死玩家 ---
             updateState { state ->
@@ -187,17 +199,33 @@ class GameViewModel @Inject constructor(
     private suspend fun runNightPhase() {
         // 清理昨夜缓存，进入天黑
         updateState { it.copy(phase = GamePhase.NIGHT_START, nightCache = NightCache()) }
+        Log.d(
+            TAG,
+            "当前游戏阶段: 进入天黑（${_uiState.value.phase}），今天是第 ${_uiState.value.dayCount} 天"
+        )
+
+
+        // 公开消息：天黑了
         appendSystemMessage("=== 第 ${_uiState.value.dayCount} 夜，天黑请闭眼 ===")
         delay(2000)
 
         // ----------------- 1. 狼人行动 -----------------
         updateState { it.copy(phase = GamePhase.NIGHT_WOLF) }
+
+        val wolfIds = getPlayerIdsByRole(Role.WOLF)
+        val goodIds = getOtherPlayerIds(Role.WOLF)
+
+        Log.d(
+            TAG,
+            "当前游戏阶段: 狼人开始行动（${_uiState.value.phase}），狼人为 ${wolfIds.joinToString("、")}"
+        )
+
         val myRole = _uiState.value.players.find { it.isMe }?.role
         var wolfKillId: String?
 
         if (myRole == Role.WOLF && _uiState.value.players.find { it.isMe }?.isAlive == true) {
             // A. 我是狼人：等待用户操作
-            appendSystemMessage("你是狼人，请选择击杀目标...")
+            appendSystemMessage("狼人请睁眼。请选择今晚的击杀目标（禁止空刀）。", wolfIds)
             // 循环直到用户选择合法的目标
             while (true) {
                 val inputId = waitForUserActionInput()
@@ -212,20 +240,31 @@ class GameViewModel @Inject constructor(
             }
         } else {
             // B. 我是好人：调用 AI
-            appendSystemMessage("狼人正在行动...") // 假装不知道
-            wolfKillId = aiRepository.getWolfKillTarget(_uiState.value)
+            appendSystemMessage("狼人正在行动...", goodIds)
+            val wolfId = _uiState.value.players.find { it.role == Role.WOLF }?.id ?: ""
+            wolfKillId = aiRepository.getWolfKillTarget(_uiState.value, wolfId)
         }
+
+        Log.d(TAG, "狼人刀杀了 $wolfKillId")
 
         // 记录狼刀
         updateState { it.copy(nightCache = it.nightCache.copy(wolfKillTargetId = wolfKillId)) }
         delay(Random.nextLong(1500, 2000))
 
         // ----------------- 2. 女巫行动 -----------------
+        Log.d(
+            TAG,
+            "当前游戏阶段: 女巫开始行动（${_uiState.value.phase}）"
+        )
+
         updateState { it.copy(phase = GamePhase.NIGHT_WITCH) }
 
         if (myRole == Role.WITCH && _uiState.value.players.find { it.isMe }?.isAlive == true) {
             // A. 我是女巫
-            appendSystemMessage("昨夜 ${getPlayerName(wolfKillId)} 被袭击了。")
+            appendSystemMessage(
+                "昨夜 ${getPlayerName(wolfKillId)} 被袭击了。",
+                listOf(getMyId())
+            )
             // 这里 UI 会根据 State 显示“救/毒/跳过”按钮，逻辑较复杂，简化为：等待用户指令
             // 我们假设 UI 返回的 inputId 格式： "SAVE:id" 或 "POISON:id" 或 "SKIP"
             while (true) {
@@ -242,7 +281,7 @@ class GameViewModel @Inject constructor(
                         updateState {
                             it.copy(
                                 nightCache = it.nightCache.copy(witchSaveTargetId = target),
-                                witchInventory = it.witchInventory.copy(hasAntidote = true)
+                                witchInventory = it.witchInventory.copy(hasAntidote = false)
                             )
                         }
                         break
@@ -254,7 +293,7 @@ class GameViewModel @Inject constructor(
                         updateState {
                             it.copy(
                                 nightCache = it.nightCache.copy(witchPoisonTargetId = target),
-                                witchInventory = it.witchInventory.copy(hasPoison = true)
+                                witchInventory = it.witchInventory.copy(hasPoison = false)
                             )
                         }
                         break
@@ -267,13 +306,16 @@ class GameViewModel @Inject constructor(
             }
         } else {
             // B. AI 女巫
-            appendSystemMessage("女巫正在行动...")
-            when (val action = aiRepository.getWitchAction(_uiState.value, wolfKillId)) {
+            appendSystemMessage("女巫正在行动...", getOtherPlayerIds(Role.WITCH))
+            val witchId = _uiState.value.players.find { it.role == Role.WITCH }?.id
+                ?: throw IllegalStateException("无女巫")
+            when (val action = aiRepository.getWitchAction(_uiState.value, wolfKillId, witchId)) {
                 is WitchAction.Save -> updateState {
                     it.copy(
                         nightCache = it.nightCache.copy(
-                            witchSaveTargetId = action.targetId
-                        )
+                            witchSaveTargetId = action.targetId,
+                        ),
+                        witchInventory = it.witchInventory.copy(hasAntidote = false)
                     )
                 }
 
@@ -281,20 +323,32 @@ class GameViewModel @Inject constructor(
                     it.copy(
                         nightCache = it.nightCache.copy(
                             witchPoisonTargetId = action.targetId
-                        )
+                        ),
+                        witchInventory = it.witchInventory.copy(hasPoison = false)
                     )
                 }
 
                 is WitchAction.Skip -> {}
             }
         }
+
+        Log.d(
+            TAG,
+            "女巫行动结束，新的药水状态为：${_uiState.value.witchInventory}"
+        )
         delay(Random.nextLong(1000, 2000))
 
         // ----------------- 3. 预言家行动 -----------------
         updateState { it.copy(phase = GamePhase.NIGHT_SEER) }
+        Log.d(
+            TAG,
+            "当前游戏阶段: 预言家开始行动（${_uiState.value.phase}），预言家为 ${
+                _uiState.value.players.filter { it.role == Role.SEER }.joinToString("、")
+            }"
+        )
 
         if (myRole == Role.SEER && _uiState.value.players.find { it.isMe }?.isAlive == true) {
-            appendSystemMessage("请选择查验目标...")
+            appendSystemMessage("请选择查验目标...", listOf(getMyId()))
             val targetId = waitForUserActionInput()
 
             val targetPlayer = _uiState.value.players.find { it.id == targetId }
@@ -309,32 +363,39 @@ class GameViewModel @Inject constructor(
                 }
 
                 if (isGood) {
-                    appendSystemMessage("${getPlayerName(targetId)} 是好人")
+                    appendSystemMessage(
+                        "${getPlayerName(targetId)} 是好人",
+                        listOf(getMyId())
+                    )
                 } else {
-                    appendSystemMessage("${getPlayerName(targetId)} 是狼人")
+                    appendSystemMessage(
+                        "${getPlayerName(targetId)} 是狼人",
+                        listOf(getMyId())
+                    )
                 }
 
                 // 暂停一下让用户看结果
                 delay(3000)
             }
         } else {
-            appendSystemMessage("预言家正在行动...")
-            val targetId = aiRepository.getSeerVerifyTarget(_uiState.value)
+            appendSystemMessage("预言家正在行动...", getOtherPlayerIds(Role.SEER))
+            val seerId = _uiState.value.players.find { it.role == Role.SEER }?.id ?: ""
+            val targetId = aiRepository.getSeerVerifyTarget(_uiState.value, seerId)
             updateState { it.copy(nightCache = it.nightCache.copy(seerVerifyTargetId = targetId)) }
         }
         delay(1000)
     }
 
-
     private suspend fun runDayDiscussionPhase(nightResult: CalculateNightResultUseCase.NightResult) {
-        // 这里的 phase 切换可以保留，或者是直接进入 DISCUSSION
         updateState { it.copy(phase = GamePhase.DAY_DISCUSSION) }
 
         // 1. 处理遗言 (仅首夜死亡有遗言)
         // 此时玩家状态已经是 isAlive=false 了，但我们需要根据 nightResult 知道是谁刚死的
         if (_uiState.value.dayCount == 1 && nightResult.deadPlayerIds.isNotEmpty()) {
-            appendSystemMessage("请发表遗言...")
             for (deadId in nightResult.deadPlayerIds) {
+                updateState { it.copy(currentSpeakerId = deadId) }
+                appendSystemMessage("请 ${getPlayerName(deadId)} 发表遗言...", listOf())
+
                 // 调用之前的通用发言方法
                 processSpeech(deadId, isLastWords = true)
             }
@@ -396,7 +457,7 @@ class GameViewModel @Inject constructor(
 
         for (player in alivePlayers) {
             if (player.isMe) {
-                appendSystemMessage("请选择投票对象...")
+                appendSystemMessage("请你选择投票对象...")
                 val targetId = waitForUserActionInput()
                 votes[player.id] = targetId
             } else {
@@ -428,6 +489,8 @@ class GameViewModel @Inject constructor(
 
                 // 遗言判定 (首日出局)
                 if (_uiState.value.dayCount == 1) {
+                    updateState { it.copy(currentSpeakerId = outId) }
+
                     processSpeech(outId, isLastWords = true)
                 }
             }
@@ -464,8 +527,45 @@ class GameViewModel @Inject constructor(
         _uiState.update(block)
     }
 
-    private fun appendSystemMessage(text: String) {
-        val msg = ChatMessage(uuid(), "SYSTEM", "法官", text, isSystem = true)
+    /**
+     * 获取所有玩家ID列表
+     */
+    private fun getAllPlayerIds(): List<String> {
+        return _uiState.value.players.map { it.id }
+    }
+
+    /**
+     * 获取我的玩家ID
+     */
+    private fun getMyId(): String {
+        return _uiState.value.myId
+    }
+
+    /**
+     * 获取除指定角色外的所有玩家ID
+     */
+    private fun getOtherPlayerIds(role: Role): List<String> {
+        return _uiState.value.players.filter { it.role != role }.map { it.id }
+    }
+
+    /**
+     * 获取指定角色的玩家ID
+     */
+    private fun getPlayerIdsByRole(role: Role): List<String> {
+        return _uiState.value.players.filter { it.role == role }.map { it.id }
+    }
+
+    /**
+     * 添加系统消息
+     */
+    private fun appendSystemMessage(text: String, visibleTo: List<String> = emptyList()) {
+        val msg = ChatMessage(
+            uuid(),
+            SYSTEM_MESSAGE_SENDER_ID,
+            "法官",
+            text,
+            visibleTo
+        )
         updateState { it.copy(chatHistory = it.chatHistory + msg) }
     }
 
@@ -488,6 +588,13 @@ class GameViewModel @Inject constructor(
         val result = deferred.await()
         userSpeechDeferred = null
         return result
+    }
+
+    /**
+     * 退出游戏，清空状态
+     */
+    fun exitGame() {
+        updateState { GameState() }
     }
 
 

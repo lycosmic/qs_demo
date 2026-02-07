@@ -49,7 +49,7 @@ fun ChatBubble(message: ChatMessage, isMe: Boolean) {
     ) {
         // --- 1. 别人的头像 (在左边) ---
         if (!isMe) {
-            Avatar(isSystem = message.isSystem)
+            Avatar(isSystem = message.isSystemMessage())
             Spacer(modifier = Modifier.width(8.dp))
         }
 
@@ -60,7 +60,7 @@ fun ChatBubble(message: ChatMessage, isMe: Boolean) {
             modifier = Modifier.weight(1f, fill = false) // fill=false 让气泡宽度自适应内容
         ) {
             // 显示发送者名字 (如果是系统法官，通常不显示名字，只看头像)
-            if (!isMe && !message.isSystem) {
+            if (!isMe && !message.isSystemMessage()) {
                 Text(
                     text = message.senderName,
                     style = MaterialTheme.typography.labelSmall,

@@ -10,11 +10,8 @@ data class Player(
     val role: Role,          // 底牌
     val isAlive: Boolean = true,
     val isMe: Boolean = false // 标记是否是当前用户
-) {
-    // 判断阵营
-    val camp: Camp
-        get() = if (role == Role.WOLF) Camp.WOLF else Camp.GOOD
-}
+)
+
 
 /**
  * 女巫药水背包
@@ -63,14 +60,12 @@ data class GameState(
     // 必须记录每一晚发生了什么，天亮结算后重置
     val nightCache: NightCache = NightCache(),
     val dayCount: Int = 1, // 第几天
-    // 标记当前是否处于遗言环节
-    val isLastWordsPhase: Boolean = false,
     // 游戏胜负
     val winResult: WinResult = WinResult.PLAYING,
 ) {
     // 方便获取我的角色
     val myRole: Role
-        get() = players.find { it.isMe }?.role ?: Role.VILLAGER // 默认给个民防止空指针
+        get() = players.find { it.isMe }?.role ?: Role.VILLAGER
 
     // 方便获取我的 ID
     val myId: String
@@ -87,8 +82,25 @@ data class GameState(
  */
 data class ChatMessage(
     val id: String,
-    val senderId: String, // 发送者ID，如果是系统消息，可以是 "SYSTEM"
-    val senderName: String,
-    val content: String,
-    val isSystem: Boolean = false
-)
+    val senderId: String, // 发送者ID，如果是系统消息，是 "SYSTEM"
+    val senderName: String, // 发送者名称
+    val content: String, // 消息内容
+    // 可见性名单
+    // 空列表 = 所有人可见 (Public)
+    // 非空 = 仅列表内的 ID 可见 (Private/Whisper)
+    val visibleToIds: List<String> = emptyList()
+) {
+    // 聊天消息是否可见
+    fun isVisibleTo(playerId: String): Boolean {
+        return visibleToIds.isEmpty() || visibleToIds.contains(playerId)
+    }
+
+    // 是否是系统消息
+    fun isSystemMessage(): Boolean {
+        return senderId == SYSTEM_MESSAGE_SENDER_ID
+    }
+
+    companion object {
+        const val SYSTEM_MESSAGE_SENDER_ID = "SYSTEM"
+    }
+}

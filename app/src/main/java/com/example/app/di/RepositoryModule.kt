@@ -1,6 +1,6 @@
 package com.example.app.di
 
-import com.example.data.repository.MockAiActorRepository
+import com.example.data.repository.DirectAiRepository
 import com.example.domain.repository.AiActorRepository
 import dagger.Binds
 import dagger.Module
@@ -12,10 +12,9 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
 
-    // TODO: 把 MockAiActorRepository 改成 RealAiActorRepository
     @Binds
     @Singleton
     abstract fun bindAiActorRepository(
-        impl: MockAiActorRepository
+        impl: DirectAiRepository
     ): AiActorRepository
 }

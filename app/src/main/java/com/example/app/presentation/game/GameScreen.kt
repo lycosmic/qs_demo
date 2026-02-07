@@ -42,6 +42,7 @@ import com.example.app.presentation.game.components.ChatBottomBar
 import com.example.app.presentation.game.components.ChatBubble
 import com.example.app.presentation.game.components.GameTopBar
 import com.example.app.presentation.game.components.NightBottomBar
+import com.example.app.presentation.game.components.RememberBottomBar
 import com.example.app.presentation.game.components.ResultOverlay
 import com.example.app.presentation.game.components.RoleInfoCard
 import com.example.app.presentation.game.components.SilenceBottomBar
@@ -61,7 +62,7 @@ import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(viewModel: GameViewModel = hiltViewModel()) {
+fun ChatScreen(onExitGame: () -> Unit, viewModel: GameViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
@@ -92,14 +93,23 @@ fun ChatScreen(viewModel: GameViewModel = hiltViewModel()) {
 
     // 判断底部显示什么：聊天框、禁言条、还是夜间提示
     val bottomContentType = when {
-        uiState.phase == GamePhase.DAY_DISCUSSION -> "CHAT"
+        uiState.phase == GamePhase.WAITING -> "REMEMBER"
+        (uiState.phase == GamePhase.DAY_DISCUSSION
+                && uiState.currentSpeakerId == uiState.myId)
+                ||
+                (uiState.phase == GamePhase.DAY_VOTING
+                        && uiState.dayCount == 1
+                        && uiState.currentSpeakerId == uiState.myId)
+            -> "CHAT"
+
         isNight -> "NIGHT_TEXT"
         else -> "SILENCE" // 默认（包括初始 WAITING 阶段）显示禁言
     }
 
     // --- 判断是否轮到我发言 ---
-    val isMyTurn = uiState.phase == GamePhase.DAY_DISCUSSION &&
-            uiState.currentSpeakerId == uiState.myId
+    val isMyTurn =
+        (uiState.phase == GamePhase.DAY_DISCUSSION || uiState.phase == GamePhase.DAY_VOTING) &&
+                uiState.currentSpeakerId == uiState.myId
 
     // --- Toast 控制状态 ---
     var showTurnToast by remember { mutableStateOf(false) }
@@ -141,6 +151,7 @@ fun ChatScreen(viewModel: GameViewModel = hiltViewModel()) {
     BackHandler(enabled = true) {
         return@BackHandler
     }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = bgColor,
@@ -151,7 +162,8 @@ fun ChatScreen(viewModel: GameViewModel = hiltViewModel()) {
                     titleColor = if (isNight) Color.White else Color.Black,
                     containerColor = bgColor,
                     onExit = {
-                        // TODO: 退出游戏
+                        viewModel.exitGame()
+                        onExitGame()
                     },
                     isVotingEnabled = canVote,
                     onVoteClick = {
@@ -170,7 +182,8 @@ fun ChatScreen(viewModel: GameViewModel = hiltViewModel()) {
                         }
                     )
 
-                    "NIGHT_TEXT" -> NightBottomBar("长夜漫漫，请保持安静~")
+                    "REMEMBER" -> RememberBottomBar()
+                    "NIGHT_TEXT" -> NightBottomBar("🌙 长夜漫漫，请保持安静~")
                     "SILENCE" -> SilenceBottomBar() // 显示禁言条
                 }
             }
@@ -201,7 +214,14 @@ fun ChatScreen(viewModel: GameViewModel = hiltViewModel()) {
                     }
 
                     items(uiState.chatHistory) { msg ->
-                        ChatBubble(message = msg, isMe = msg.senderId == uiState.myId)
+                        // 只有当 (消息是公开的) OR (发给我的) OR (我发的) 才显示
+                        val isVisible = msg.visibleToIds.isEmpty() ||
+                                msg.visibleToIds.contains(uiState.myId) ||
+                                msg.senderId == uiState.myId
+
+                        if (isVisible) {
+                            ChatBubble(message = msg, isMe = msg.senderId == uiState.myId)
+                        }
                     }
                 }
             }
@@ -404,10 +424,4 @@ fun ChatScreen(viewModel: GameViewModel = hiltViewModel()) {
     }
 
 }
-
-fun getSeatById(id: String, players: List<Player>): Int =
-    players.find { it.id == id }?.seatNumber ?: 0
-
-fun getIdBySeat(seat: Int, players: List<Player>): String =
-    players.find { it.seatNumber == seat }?.id ?: ""
 

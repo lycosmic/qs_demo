@@ -17,7 +17,7 @@ class MockAiActorRepository @Inject constructor() : AiActorRepository {
     private suspend fun simulateThinking() = delay(Random.nextLong(1000, 2500))
 
     // --- 1. 狼人 AI ---
-    override suspend fun getWolfKillTarget(gameState: GameState): String {
+    override suspend fun getWolfKillTarget(gameState: GameState, wolfId: String): String {
         simulateThinking()
 
         // 逻辑：随机选择一个活着的的玩家（包括狼人自己）
@@ -33,7 +33,8 @@ class MockAiActorRepository @Inject constructor() : AiActorRepository {
     // --- 2. 女巫 AI ---
     override suspend fun getWitchAction(
         gameState: GameState,
-        wolfKillTargetId: String?
+        wolfKillTargetId: String?,
+        witchId: String
     ): WitchAction {
         simulateThinking()
 
@@ -69,12 +70,12 @@ class MockAiActorRepository @Inject constructor() : AiActorRepository {
     }
 
     // --- 3. 预言家 AI ---
-    override suspend fun getSeerVerifyTarget(gameState: GameState): String {
+    override suspend fun getSeerVerifyTarget(gameState: GameState, seerId: String): String {
         simulateThinking()
 
         // 逻辑：优先查验活着的人，排除自己
         val validTargets = gameState.players.filter {
-            it.isAlive && it.role != Role.SEER
+            it.isAlive && it.id != seerId && it.role != Role.SEER
         }
 
         return validTargets.randomOrNull()?.id ?: ""

@@ -23,12 +23,12 @@ fun NightBottomBar(text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.Black)
-            .padding(vertical = 12.dp),
+            .padding(vertical = 24.dp),
         contentAlignment = Alignment.Center
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // 这里建议用一个月亮图标资源
-            Text(text = "🌙 ", fontSize = 14.sp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 text = text,
                 color = Color.LightGray,
